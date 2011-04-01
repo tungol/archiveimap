@@ -6,15 +6,18 @@ pretty simple wrapper around offlineimap and git. The commit message is what
 offlineimap prints to stdout while running.
 
 To use:
-Make sure offlineimap and git are both installed. First configure offlineimap
-appropriately, and then set the configuration variables here.
+Make sure offlineimap and git are both installed. First configure
+offlineimap appropriately, and then set the configuration variables here.
 
-ACCOUNTS is the name (or list of names) of the accounts in offlineimap you wish
-to keep archived.
+ACCOUNTS is the name (or list of names) of the accounts in offlineimap you
+wishto keep archived.
+
 CONFIG_FILE is usually going to be the same, unless you're doing something
 strange.
+
 GIT_AUTHOR is the author that will be used to make git commits
-STDOUT: set to True if you want output, False to not print anything.
+
+Set STDOUT to True if you want output, False to not print anything.
 
 Then drop it in cron, or however else you're using it.
 '''
@@ -23,7 +26,9 @@ from __future__ import print_function
 from tempfile import NamedTemporaryFile
 from ConfigParser import SafeConfigParser
 import os
+from os.path import exists, expanduser, join
 import subprocess
+from sys import argv
 
 __author__ = 'Stephen Morton'
 __version__ = '0.1'
@@ -55,64 +60,86 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 
 
-ACCOUNTS = 'Example'
-CONFIG_FILE = '~/.offlineimaprc'
-AUTHOR = 'Example <example@example.com>'
-STDOUT = True
-
-
-def call(args, log):
+def call(args, log=None, stdout=True):
     '''Call a command and log the results.'''
     process = subprocess.Popen(args, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
     for line in process.stdout:
-        if STDOUT:
+        if stdout:
             print(line, end='')
-        if not log.closed:
+        if log is not None:
             log.write(line)
 
 
-def init(directories, log):
+def init(directories, log, stdout=None):
     '''Make directories and initialize git, if neccesary.'''
     for directory in directories:
-        if not os.path.exists(directory):
+        if not exists(directory):
             os.mkdir(directory)
-        if not os.path.exists(os.path.join(directory, '.git')):
+        if not exists(join(directory, '.git')):
             os.chdir(directory)
             call(['git', 'init'], log)
 
 
-def get_archive_directories(accounts):
+def get_archive_directories(accounts=None, config_file=None, **kwargs):
     '''Get the directories appropriate for accounts by examining
     CONFIG_FILE.'''
     # python gets confused about reference before assignment without the
     # explict global statement in this case
     parser = SafeConfigParser()
-    parser.read(os.path.expanduser(CONFIG_FILE))
+    parser.read(config_file)
     directories = []
     for account in accounts:
         local_name = parser.get('Account ' + account, 'localrepository')
         local_folder = parser.get('Repository ' + local_name, 'localfolders')
-        directories.append(os.path.expanduser(local_folder))
+        directories.append(expanduser(local_folder))
     return directories
 
 
-def archive_imap(accounts):
+def get_settings(config_file=None):
+    '''
+    If config_file exists, return settings from there. Otherwise, return
+    default settings. Returns a dict.
+    '''
+    settings = {'stdout': True,
+                'config_file': '~/.offlineimaprc',
+                'git_author': None,
+                'accounts': None}
+    if config_file is None:
+        config_file = expanduser('~/.archiveimaprc')
+    if exists(config_file):
+        parser = SafeConfigParser(settings)
+        parser.read(config_file)
+        items = dict(parser.items('Settings'))
+        for option in settings.keys():
+            if option in items:
+                settings.update({option: items[option]})
+    settings['config_file'] = expanduser(settings['config_file'])
+    return settings
+
+
+def archive_imap(accounts=None):
     '''Call offlineimap and put the results in a git repository.'''
-    if type(accounts) in (str, unicode):
-        accounts = [accounts]
+    settings = get_settings()
+    if accounts is not None:
+        settings.update({'accounts': accounts})
     log = NamedTemporaryFile(delete=False)
-    archive_directories = get_archive_directories(accounts)
-    init(archive_directories, log)
-    call(['offlineimap', '-u', 'Noninteractive.Basic', '-a',
-         ','.join(accounts)], log)
+    archive_directories = get_archive_directories(**settings)
+    init(archive_directories, log, settings['stdout'])
+    if settings['accounts'] is not None:
+        call(['offlineimap', '-u', 'Noninteractive.Basic', '-a',
+            ','.join(accounts)], log, settings['stdout'])
+    else:
+        call(['offlineimap', '-u', 'Noninteractive.Basic'], log,
+             settings['stdout'])
     for directory in archive_directories:
         os.chdir(directory)
         call(['git', 'add', '-A'], log)
         log.close()
-        call(['git', 'commit', '--author="%s"' % GIT_AUTHOR, '-F', log.name],
-             log)
+        if settings['git_author'] is not None:
+            call(['git', 'commit', '--author="%s"' % settings['git_athor'],
+                  '-F', log.name], stdout=settings['stdout'])
 
 
 if __name__ == '__main__':
-    archive_imap(ACCOUNTS)
+    archive_imap(argv[1:])
