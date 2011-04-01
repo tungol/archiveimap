@@ -1,21 +1,23 @@
 '''
 Archiveimap is a tool to keep an email account in version control. It's a
-pretty simple wrapper around offlineimap and git.
+pretty simple wrapper around offlineimap and git. The commit message is what
+offlineimap prints to stdout while running.
 
 To use:
 Make sure offlineimap and git are both installed. First configure offlineimap
 appropriately, and then set the configuration variables here.
+
 ACCOUNTS is the name (or list of names) of the accounts in offlineimap you wish
-to keep archived. 
-CONFIG_FILE is usually going to be the same, unless you're doing something 
+to keep archived.
+CONFIG_FILE is usually going to be the same, unless you're doing something
 strange.
 AUTHOR is the author that will be used to make git commits
-LOGGING is the type of logging you want, values can be 'file' or 'stdout',
-anything else will result in no logging.
-LOGFILE is the name of the file to log to, if logging to a file.
+STDOUT: set to True if you want output, False to not print anything.
 
 Then drop it in cron, or however you're using it.
 '''
+
+from __future__ import print_function
 
 __licence__ = '''
 Copyright (c) 2011, Stephen Morton
@@ -48,17 +50,16 @@ __version__ = '0.1'
 
 __author__ = 'Stephen Morton'
 
-import ConfigParser  # apparently this causes os.path import???
+from tempfile import NamedTemporaryFile
+from ConfigParser import SafeConfigParser
 import os
 import subprocess
-import time
 
 
 ACCOUNTS = 'Example'
 CONFIG_FILE = '~/.offlineimaprc'
 AUTHOR = 'Example <example@example.com>'
-LOGGING = 'stdout'
-LOGFILE = '~/.archiveimap.log'
+STDOUT = True
 
 
 def call(args, log):
@@ -66,12 +67,14 @@ def call(args, log):
     process = subprocess.Popen(args, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
     for line in process.stdout:
-        log(line)
+        if STDOUT:
+            print(line, end='')
+        if not log.closed:
+            log.write(line)
 
 
 def init(directories, log):
     '''Start logging. If neccesary, make directories and initialize git.'''
-    log('\n%s\n' % time.strftime('%a, %d %b %Y %H:%M:%S +0000'))
     for directory in directories:
         if not os.path.exists(directory):
             os.mkdir(directory)
@@ -80,40 +83,18 @@ def init(directories, log):
             call(['git', 'init'], log)
 
 
-def get_log_func():
-    '''Determine and return the log function specified in LOGGING.'''
-    logfile = os.path.expanduser(LOGFILE)
-    
-    def log_to_file(string):
-        '''Log to a file.'''
-        with open(logfile, 'a') as log:
-            log.write(string)
-    
-    def log_to_stdout(string):
-        '''Log to STDOUT.'''
-        print string.strip()
-    
-    def no_logs(string):
-        '''Don't log.'''
-        pass
-    
-    if LOGGING == 'file':
-        return log_to_file
-    elif LOGGING == 'stdout':
-        return log_to_stdout
-    return no_logs
-
-
 def get_archive_directories():
-    '''Get the directories appropriate for ACCOUNTS by examining 
+    '''Get the directories appropriate for ACCOUNTS by examining
     CONFIG_FILE.'''
     # python gets confused about reference before assignment without the
     # explict global statement in this case
     global ACCOUNTS
-    parser = ConfigParser.SafeConfigParser()
+    parser = SafeConfigParser()
     parser.read(os.path.expanduser(CONFIG_FILE))
     if type(ACCOUNTS) in (str, unicode):
         ACCOUNTS = [ACCOUNTS]
+    else:
+        ACCOUNTS = [account.strip() for account in ','.split(ACCOUNTS)]
     directories = []
     for account in ACCOUNTS:
         local_name = parser.get('Account ' + account, 'localrepository')
@@ -124,16 +105,16 @@ def get_archive_directories():
 
 def archive_imap():
     '''Call offlineimap and put the results in a git repository.'''
-    log = get_log_func()
+    log = NamedTemporaryFile(delete=False)
     archive_directories = get_archive_directories()
     init(archive_directories, log)
     call(['offlineimap', '-u', 'Noninteractive.Basic', '-a',
-        ','.join(ACCOUNTS)], log)
+         ','.join(ACCOUNTS)], log)
     for directory in archive_directories:
         os.chdir(directory)
         call(['git', 'add', '-A'], log)
-        call(['git', 'commit', '--author="%s"' % AUTHOR,
-            '--message="Automatic commit."'], log)
+        log.close()
+        call(['git', 'commit', '--author="%s"' % AUTHOR, '-F', log.name], log)
 
 
 if __name__ == '__main__':
