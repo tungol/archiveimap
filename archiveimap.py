@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 '''
 Archiveimap is a tool to keep an email account in version control. It's a
 pretty simple wrapper around offlineimap and git. The commit message is what
@@ -11,15 +13,21 @@ ACCOUNTS is the name (or list of names) of the accounts in offlineimap you wish
 to keep archived.
 CONFIG_FILE is usually going to be the same, unless you're doing something
 strange.
-AUTHOR is the author that will be used to make git commits
+GIT_AUTHOR is the author that will be used to make git commits
 STDOUT: set to True if you want output, False to not print anything.
 
-Then drop it in cron, or however you're using it.
+Then drop it in cron, or however else you're using it.
 '''
 
 from __future__ import print_function
+from tempfile import NamedTemporaryFile
+from ConfigParser import SafeConfigParser
+import os
+import subprocess
 
-__licence__ = '''
+__author__ = 'Stephen Morton'
+__version__ = '0.1'
+__license__ = '''
 Copyright (c) 2011, Stephen Morton
 All rights reserved.
 
@@ -46,15 +54,6 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 
-__version__ = '0.1'
-
-__author__ = 'Stephen Morton'
-
-from tempfile import NamedTemporaryFile
-from ConfigParser import SafeConfigParser
-import os
-import subprocess
-
 
 ACCOUNTS = 'Example'
 CONFIG_FILE = '~/.offlineimaprc'
@@ -74,7 +73,7 @@ def call(args, log):
 
 
 def init(directories, log):
-    '''Start logging. If neccesary, make directories and initialize git.'''
+    '''Make directories and initialize git, if neccesary.'''
     for directory in directories:
         if not os.path.exists(directory):
             os.mkdir(directory)
@@ -83,39 +82,37 @@ def init(directories, log):
             call(['git', 'init'], log)
 
 
-def get_archive_directories():
-    '''Get the directories appropriate for ACCOUNTS by examining
+def get_archive_directories(accounts):
+    '''Get the directories appropriate for accounts by examining
     CONFIG_FILE.'''
     # python gets confused about reference before assignment without the
     # explict global statement in this case
-    global ACCOUNTS
     parser = SafeConfigParser()
     parser.read(os.path.expanduser(CONFIG_FILE))
-    if type(ACCOUNTS) in (str, unicode):
-        ACCOUNTS = [ACCOUNTS]
-    else:
-        ACCOUNTS = [account.strip() for account in ','.split(ACCOUNTS)]
     directories = []
-    for account in ACCOUNTS:
+    for account in accounts:
         local_name = parser.get('Account ' + account, 'localrepository')
         local_folder = parser.get('Repository ' + local_name, 'localfolders')
         directories.append(os.path.expanduser(local_folder))
     return directories
 
 
-def archive_imap():
+def archive_imap(accounts):
     '''Call offlineimap and put the results in a git repository.'''
+    if type(accounts) in (str, unicode):
+        accounts = [accounts]
     log = NamedTemporaryFile(delete=False)
-    archive_directories = get_archive_directories()
+    archive_directories = get_archive_directories(accounts)
     init(archive_directories, log)
     call(['offlineimap', '-u', 'Noninteractive.Basic', '-a',
-         ','.join(ACCOUNTS)], log)
+         ','.join(accounts)], log)
     for directory in archive_directories:
         os.chdir(directory)
         call(['git', 'add', '-A'], log)
         log.close()
-        call(['git', 'commit', '--author="%s"' % AUTHOR, '-F', log.name], log)
+        call(['git', 'commit', '--author="%s"' % GIT_AUTHOR, '-F', log.name],
+             log)
 
 
 if __name__ == '__main__':
-    archive_imap()
+    archive_imap(ACCOUNTS)
