@@ -7,17 +7,9 @@ offlineimap prints to stdout while running.
 
 To use:
 Make sure offlineimap and git are both installed. First configure
-offlineimap appropriately, and then set the configuration variables here.
+offlineimap appropriately.
 
-ACCOUNTS is the name (or list of names) of the accounts in offlineimap you
-wishto keep archived.
 
-CONFIG_FILE is usually going to be the same, unless you're doing something
-strange.
-
-GIT_AUTHOR is the author that will be used to make git commits
-
-Set STDOUT to True if you want output, False to not print anything.
 
 Then drop it in cron, or however else you're using it.
 '''
@@ -78,10 +70,10 @@ def init(directories, log, stdout=None):
             os.mkdir(directory)
         if not exists(join(directory, '.git')):
             os.chdir(directory)
-            call(['git', 'init'], log)
+            call(['git', 'init'], log, stdout)
 
 
-def get_archive_directories(accounts=None, config_file=None, **kwargs):
+def get_archive_directories(accounts, config_file):
     '''Get the directories appropriate for accounts by examining
     CONFIG_FILE.'''
     # python gets confused about reference before assignment without the
@@ -101,10 +93,10 @@ def get_settings(config_file=None):
     If config_file exists, return settings from there. Otherwise, return
     default settings. Returns a dict.
     '''
-    settings = {'stdout': True,
+    settings = {'stdout': 'True',
                 'config_file': '~/.offlineimaprc',
-                'git_author': None,
-                'accounts': None}
+                'git_author': '',
+                'accounts': ''}
     if config_file is None:
         config_file = expanduser('~/.archiveimaprc')
     if exists(config_file):
@@ -115,30 +107,37 @@ def get_settings(config_file=None):
             if option in items:
                 settings.update({option: items[option]})
     settings['config_file'] = expanduser(settings['config_file'])
-    return settings
+    translate = {'True': True, 'False': False, '': None}
+    for key, value in settings.items():
+        if value in translate:
+            settings.update({key: translate[value]})
+    return (settings['accounts'], settings['config_file'],
+            settings['git_author'], settings['stdout'])
 
 
 def archive_imap(accounts=None):
     '''Call offlineimap and put the results in a git repository.'''
-    settings = get_settings()
-    if accounts is not None:
-        settings.update({'accounts': accounts})
+    _accounts, config_file, git_author, stdout = get_settings()
+    if accounts is None:
+        accounts = _accounts
     log = NamedTemporaryFile(delete=False)
-    archive_directories = get_archive_directories(**settings)
-    init(archive_directories, log, settings['stdout'])
-    if settings['accounts'] is not None:
+    archive_directories = get_archive_directories(accounts, config_file)
+    init(archive_directories, log, stdout)
+    if accounts is not None:
         call(['offlineimap', '-u', 'Noninteractive.Basic', '-a',
-            ','.join(accounts)], log, settings['stdout'])
+            ','.join(accounts)], log, stdout)
     else:
         call(['offlineimap', '-u', 'Noninteractive.Basic'], log,
-             settings['stdout'])
+             stdout)
     for directory in archive_directories:
         os.chdir(directory)
         call(['git', 'add', '-A'], log)
         log.close()
-        if settings['git_author'] is not None:
-            call(['git', 'commit', '--author="%s"' % settings['git_athor'],
-                  '-F', log.name], stdout=settings['stdout'])
+        if git_author is not None:
+            call(['git', 'commit', '--author="%s"' % git_author, '-F',
+                  log.name], stdout=stdout)
+        else:
+            call(['git', 'commit', '-F', log.name], stdout=stdout)
 
 
 if __name__ == '__main__':
