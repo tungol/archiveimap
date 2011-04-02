@@ -6,32 +6,27 @@ pretty simple wrapper around offlineimap and git. The commit message is what
 offlineimap prints to stdout while running.
 
 To use:
-Make sure offlineimap and git are both installed. First configure
-offlineimap appropriately.
+Make sure offlineimap and git are both installed and that offlineIMAP is
+properly configured. If you want to archive all accounts in offlineIMAP,
+using config files in the default locations and the system git author,
+this is all that is needed. For other configurations, options can be set in
+a configuration file or at the command line. The command line takes
+precedence over the configuration file.
 
-TODO: Describe config file here.
+The configuration file defaults to ~/.archiveimaprc and has a single section
+named Settings. The following options are available:
 
-Commandline options:
+accounts: a comma seperated list of accounts to sync and put in git.
+          Accounts must be defined in the offlineimap configuration file.
+          Defaults to whatever accounts offlineimap is configured to sync.
+offlineimap-config: the path to the offlineimap configuration file. Defaults
+                    to ~/.offlineimaprc
+author: The author to use when making commits in git. Defaults to whatever
+        git is configured to use by default.
+quiet: True or False. Controls whether to output status to stdout as well as
+       logging to git commit message. Defaults to False.
 
-usage: archiveimap.py [-h] [-q] [-a account [account ...]] [-c filename]
-                      [--offlineimap-config filename]
-                      [--author "Name <email@domain.com>"]
-
-Keep your email archived in git.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -q                    print no output
-  -a account [account ...]
-                        specify accounts to archive. Must be listed in the
-                        offlineimap configuration file.
-  -c filename           specify a configuration file to use instead of
-                        ~/.archiveimaprc
-  --offlineimap-config filename
-                        specify offlineimap configuration file to use instead
-                        of ~/.offlineimaprc
-  --author "Name <email@domain.com>"
-                        author to use for the git commit
+Commandline options can be examined by running ./archiveimap.py -h
 '''
 
 from __future__ import print_function
@@ -105,24 +100,29 @@ def init(directories, log, stdout=None):
 
 
 def get_archive_directories(accounts, config_file):
-    '''Get the directories appropriate for accounts by examining
-    CONFIG_FILE.'''
-    # python gets confused about reference before assignment without the
-    # explict global statement in this case
+    '''
+    Examine the offlineimap config file. If accounts is None, find what
+    accounts offlineimap syncs by default. Find what directories the
+    accounts listed in accounts are synced to. Return accounts (because it
+    might have changed) and the directories associated with them.
+    '''
     parser = SafeConfigParser()
     parser.read(config_file)
     directories = []
+    if accounts is None:
+        accounts = parser.get('general', 'accounts')
+        accounts = [account.strip() for account in accounts.split(',')]
     for account in accounts:
         local_name = parser.get('Account ' + account, 'localrepository')
         local_folder = parser.get('Repository ' + local_name, 'localfolders')
         directories.append(expanduser(local_folder))
-    return directories
+    return accounts, directories
 
 
 def parse_config_file(config_file):
     '''
-    If config_file exists, return a dictionary of settings from it. Otherwise,
-    return an empty dictionary.
+    If config_file exists, return a dictionary of settings from it.
+    Otherwise, return an empty dictionary.
     '''
     settings = {}
     config_file = fixpath(config_file)
@@ -161,30 +161,29 @@ def resolve_overrides(overrides, defaults):
     return settings
 
 
-def run_offlineimap(accounts, log=None, quiet=False):
+def run_offlineimap(accounts, config_file=None, log=None, quiet=False):
     '''Run OfflineIMAP.'''
+    args = ['offlineimap', '-u', 'Noninteractive.Basic']
     if accounts is not None:
-        call(['offlineimap', '-u', 'Noninteractive.Basic', '-a',
-            ','.join(accounts)], log, quiet)
-    else:
-        call(['offlineimap', '-u', 'Noninteractive.Basic'], log,
-             quiet)
+        args += ['-a', ','.join(accounts)]
+    if config_file is not None:
+        args += ['-c', config_file]
+    call(args, log, quiet)
 
 
 def git_commit(archive_directories, author=None, log=None, quiet=False):
     '''
-    Commit all changes in archive_directories to the appropriate git
-    repository.
+    For each directory named, commit any changes to git.
     '''
     for directory in archive_directories:
         os.chdir(directory)
         call(['git', 'add', '-A'], log)
         log.close()
+        args = ['git', 'commit', '-F', log.name]
         if author is not None:
-            call(['git', 'commit', '--author="%s"' % author, '-F',
-                  log.name], quiet=quiet)
+            args.append('--author="%s"' % author)
         else:
-            call(['git', 'commit', '-F', log.name], quiet=quiet)
+            call(args, quiet=quiet)
 
 
 def get_settings(overrides):
@@ -221,10 +220,11 @@ def archive_imap(overrides):
     '''Call offlineimap and put the results in a git repository.'''
     settings = get_settings(overrides)
     accounts, author, config_file, quiet = settings
-    archive_directories = get_archive_directories(accounts, config_file)
+    accounts, archive_directories = get_archive_directories(accounts,
+                                                            config_file)
     log = NamedTemporaryFile(delete=False)
     init(archive_directories, log, quiet)
-    run_offlineimap(accounts, log, quiet)
+    run_offlineimap(accounts, config_file, log, quiet)
     git_commit(archive_directories, author, log, quiet)
 
 
@@ -234,12 +234,16 @@ def parse_args():
     dictionary.
     '''
     parser = ArgumentParser(description='Keep your email archived in git.')
-    parser.add_argument('-q', dest='quiet', const=True,
-                        action='store_const', help='print no output')
-    parser.add_argument('-a', metavar='account', nargs='+', dest='accounts',
+    parser.add_argument('-q', '--quiet', dest='quiet', const=True,
+                        action='store_const', help='be quiet')
+    parser.add_argument('-v', '--verbose', dest='quiet', const=False,
+                        action='store_const', help='be verbose [default]')
+    parser.add_argument('-a', '--accounts', metavar='account', nargs='+',
+                        dest='accounts',
                         help='specify accounts to archive. Must be listed in '
                              'the offlineimap configuration file.')
-    parser.add_argument('-c', metavar='filename', dest='config_file',
+    parser.add_argument('-c', '--config-file', metavar='filename',
+                        dest='config_file',
                         help='specify a configuration file to use instead of '
                              '~/.archiveimaprc')
     parser.add_argument('--offlineimap-config', metavar='filename',
