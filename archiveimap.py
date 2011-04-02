@@ -15,12 +15,12 @@ Then drop it in cron, or however else you're using it.
 '''
 
 from __future__ import print_function
+from argparse import ArgumentParser
 from tempfile import NamedTemporaryFile
 from ConfigParser import SafeConfigParser
 import os
-from os.path import exists, expanduser, join
+from os.path import abspath, exists, expanduser, join
 import subprocess
-from sys import argv
 
 __author__ = 'Stephen Morton'
 __version__ = '0.1'
@@ -52,15 +52,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 
 
-def call(args, log=None, stdout=True):
+def call(args, log=None, quiet=False):
     '''Call a command and log the results.'''
     process = subprocess.Popen(args, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
     for line in process.stdout:
-        if stdout:
+        if not quiet:
             print(line, end='')
         if log is not None:
             log.write(line)
+
+
+def fixpath(path):
+    if path[0] == '~':
+        return expanduser(path)
+    else:
+        return abspath(path)
 
 
 def init(directories, log, stdout=None):
@@ -88,57 +95,133 @@ def get_archive_directories(accounts, config_file):
     return directories
 
 
-def get_settings(config_file=None):
+def parse_config_file(config_file):
     '''
-    If config_file exists, return settings from there. Otherwise, return
-    default settings. Returns a dict.
+    If config_file exists, return a dictionary of settings from it. Otherwise,
+    return an empty dictionary.
     '''
-    settings = {'stdout': 'True',
-                'config_file': '~/.offlineimaprc',
-                'git_author': '',
-                'accounts': ''}
-    if config_file is None:
-        config_file = expanduser('~/.archiveimaprc')
+    settings = {}
+    config_file = fixpath(config_file)
     if exists(config_file):
         parser = SafeConfigParser(settings)
         parser.read(config_file)
-        items = dict(parser.items('Settings'))
-        for option in settings.keys():
-            if option in items:
-                settings.update({option: items[option]})
-    settings['config_file'] = expanduser(settings['config_file'])
+        settings = dict(parser.items('Settings'))
     translate = {'True': True, 'False': False, '': None}
     for key, value in settings.items():
         if value in translate:
             settings.update({key: translate[value]})
-    return (settings['accounts'], settings['config_file'],
-            settings['git_author'], settings['stdout'])
+    return settings
 
 
-def archive_imap(accounts=None):
-    '''Call offlineimap and put the results in a git repository.'''
-    _accounts, config_file, git_author, stdout = get_settings()
-    if accounts is None:
-        accounts = _accounts
-    log = NamedTemporaryFile(delete=False)
-    archive_directories = get_archive_directories(accounts, config_file)
-    init(archive_directories, log, stdout)
+def find_value(values):
+    '''Return the first value in values that isn't None'''
+    for value in values:
+        if value is not None:
+            return value
+
+
+def resolve_overrides(overrides, defaults):
+    '''
+    Return return a dictionary with all the keys in defaults,
+    with a value equal to the value from overrides if it exists and
+    isn't None, otherwise with the value from defaults.
+    '''
+    settings = {}
+    for key in defaults:
+        if key in overrides:
+            values = [overrides[key], defaults[key]]
+            value = find_value(values)
+        else:
+            value = defaults[key]
+        settings.update({key: value})
+    return settings
+
+
+def call_offlineimap(accounts, log=None, quiet=False):
     if accounts is not None:
         call(['offlineimap', '-u', 'Noninteractive.Basic', '-a',
-            ','.join(accounts)], log, stdout)
+            ','.join(accounts)], log, quiet)
     else:
         call(['offlineimap', '-u', 'Noninteractive.Basic'], log,
-             stdout)
+             quiet)
+
+
+def call_git(archive_directories, author=None, log=None, quiet=False):
     for directory in archive_directories:
         os.chdir(directory)
         call(['git', 'add', '-A'], log)
         log.close()
-        if git_author is not None:
-            call(['git', 'commit', '--author="%s"' % git_author, '-F',
-                  log.name], stdout=stdout)
+        if author is not None:
+            call(['git', 'commit', '--author="%s"' % author, '-F',
+                  log.name], quiet=quiet)
         else:
-            call(['git', 'commit', '-F', log.name], stdout=stdout)
+            call(['git', 'commit', '-F', log.name], quiet=quiet)
+
+
+def get_settings(overrides):
+    '''
+    Resolve settings from three sources, in order of precedence:
+    1. from the command line
+    2. from the config file
+    3. built in defaults
+    
+    Returns a tuple of setting values, sorted on setting name.
+    '''
+    defaults = settings = {'quiet': False,
+                'offlineimap_config': '~/.offlineimaprc',
+                'author': None,
+                'accounts': None}
+    config_file = None
+    if 'config_file' in overrides:
+        config_file = overrides['config_file']
+    if config_file is None:
+        config_file = expanduser('~/.archiveimaprc')
+    config_file = parse_config_file(config_file)
+    defaults = resolve_overrides(config_file, defaults)
+    settings = resolve_overrides(overrides, defaults)
+    if type(settings['accounts']) in (str, unicode):
+        settings['accounts'] = [settings['accounts']]
+    settings['offlineimap_config'] = fixpath(settings['offlineimap_config'])
+    keys = settings.keys()
+    keys.sort()
+    values = [settings[key] for key in keys]
+    return values
+
+
+def archive_imap(overrides):
+    '''Call offlineimap and put the results in a git repository.'''
+    settings = get_settings(overrides)
+    accounts, author, config_file, quiet = settings
+    archive_directories = get_archive_directories(accounts, config_file)
+    log = NamedTemporaryFile(delete=False)
+    init(archive_directories, log, quiet)
+    call_offlineimap(accounts, log, quiet)
+    call_git(archive_directories, author, log, quiet)
+
+
+def parse_args():
+    '''
+    Build an ArgumentParser instance and return the parsed arguments as a
+    dictionary.
+    '''
+    parser = ArgumentParser(description='Keep your email archived in git.')
+    parser.add_argument('-q', dest='quiet', const=True,
+                        action='store_const', help='print no output')
+    parser.add_argument('-a', metavar='account', nargs='+', dest='accounts',
+                        help='specify accounts to archive. Must be listed in '
+                             'the offlineimap configuration file.')
+    parser.add_argument('-c', metavar='filename', dest='config_file',
+                        help='specify a configuration file to use instead of '
+                             '~/.archiveimaprc')
+    parser.add_argument('--offlineimap-config', metavar='filename',
+                        dest='offlineimap_config',
+                        help='specify offlineimap configuration file to use '
+                             'instead of ~/.offlineimaprc')
+    parser.add_argument('--author', dest='author',
+                        metavar='"Name <email@domain.com>"',
+                        help='author to use for the git commit')
+    return vars(parser.parse_args())
 
 
 if __name__ == '__main__':
-    archive_imap(argv[1:])
+    archive_imap(parse_args())
