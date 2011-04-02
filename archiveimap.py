@@ -9,9 +9,29 @@ To use:
 Make sure offlineimap and git are both installed. First configure
 offlineimap appropriately.
 
+TODO: Describe config file here.
 
+Commandline options:
 
-Then drop it in cron, or however else you're using it.
+usage: archiveimap.py [-h] [-q] [-a account [account ...]] [-c filename]
+                      [--offlineimap-config filename]
+                      [--author "Name <email@domain.com>"]
+
+Keep your email archived in git.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -q                    print no output
+  -a account [account ...]
+                        specify accounts to archive. Must be listed in the
+                        offlineimap configuration file.
+  -c filename           specify a configuration file to use instead of
+                        ~/.archiveimaprc
+  --offlineimap-config filename
+                        specify offlineimap configuration file to use instead
+                        of ~/.offlineimaprc
+  --author "Name <email@domain.com>"
+                        author to use for the git commit
 '''
 
 from __future__ import print_function
@@ -64,6 +84,10 @@ def call(args, log=None, quiet=False):
 
 
 def fixpath(path):
+    '''
+    If path starts with '~' return expanduser(path), otherwise return
+    abspath(path)
+    '''
     if path[0] == '~':
         return expanduser(path)
     else:
@@ -137,7 +161,8 @@ def resolve_overrides(overrides, defaults):
     return settings
 
 
-def call_offlineimap(accounts, log=None, quiet=False):
+def run_offlineimap(accounts, log=None, quiet=False):
+    '''Run OfflineIMAP.'''
     if accounts is not None:
         call(['offlineimap', '-u', 'Noninteractive.Basic', '-a',
             ','.join(accounts)], log, quiet)
@@ -146,7 +171,11 @@ def call_offlineimap(accounts, log=None, quiet=False):
              quiet)
 
 
-def call_git(archive_directories, author=None, log=None, quiet=False):
+def git_commit(archive_directories, author=None, log=None, quiet=False):
+    '''
+    Commit all changes in archive_directories to the appropriate git
+    repository.
+    '''
     for directory in archive_directories:
         os.chdir(directory)
         call(['git', 'add', '-A'], log)
@@ -195,8 +224,8 @@ def archive_imap(overrides):
     archive_directories = get_archive_directories(accounts, config_file)
     log = NamedTemporaryFile(delete=False)
     init(archive_directories, log, quiet)
-    call_offlineimap(accounts, log, quiet)
-    call_git(archive_directories, author, log, quiet)
+    run_offlineimap(accounts, log, quiet)
+    git_commit(archive_directories, author, log, quiet)
 
 
 def parse_args():
