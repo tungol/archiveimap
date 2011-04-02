@@ -99,7 +99,7 @@ def init(directories, log, stdout=None):
             call(['git', 'init'], log, stdout)
 
 
-def get_archive_directories(accounts, config_file):
+def get_directories(accounts, config_file):
     '''
     Examine the offlineimap config file. If accounts is None, find what
     accounts offlineimap syncs by default. Find what directories the
@@ -171,11 +171,11 @@ def run_offlineimap(accounts, config_file=None, log=None, quiet=False):
     call(args, log, quiet)
 
 
-def git_commit(archive_directories, author=None, log=None, quiet=False):
+def git_commit(directories, author=None, log=None, quiet=False):
     '''
     For each directory named, commit any changes to git.
     '''
-    for directory in archive_directories:
+    for directory in directories:
         os.chdir(directory)
         call(['git', 'add', '-A'], log)
         log.close()
@@ -191,7 +191,7 @@ def get_settings(overrides):
     Resolve settings from three sources, in order of precedence:
     1. from the command line
     2. from the config file
-    3. built in defaults
+    3. built-in defaults
     
     Returns a tuple of setting values, sorted on setting name.
     '''
@@ -216,16 +216,15 @@ def get_settings(overrides):
     return values
 
 
-def archive_imap(overrides):
+def archive_imap(overrides={}):
     '''Call offlineimap and put the results in a git repository.'''
     settings = get_settings(overrides)
     accounts, author, config_file, quiet = settings
-    accounts, archive_directories = get_archive_directories(accounts,
-                                                            config_file)
+    accounts, directories = get_directories(accounts, config_file)
     log = NamedTemporaryFile(delete=False)
-    init(archive_directories, log, quiet)
+    init(directories, log, quiet)
     run_offlineimap(accounts, config_file, log, quiet)
-    git_commit(archive_directories, author, log, quiet)
+    git_commit(directories, author, log, quiet)
 
 
 def parse_args():
