@@ -29,6 +29,9 @@ quiet: True or False. Controls whether to output status to stdout as well as
 Commandline options can be examined by running ./archiveimap.py -h
 '''
 
+# TODO: save configuration from commandline to config_file
+# TODO: setup.py, etc
+
 from __future__ import print_function
 from argparse import ArgumentParser
 from tempfile import NamedTemporaryFile
@@ -182,8 +185,7 @@ def git_commit(directories, author=None, log=None, quiet=False):
         args = ['git', 'commit', '-F', log.name]
         if author is not None:
             args.append('--author="%s"' % author)
-        else:
-            call(args, quiet=quiet)
+        call(args, quiet=quiet)
 
 
 def get_settings(overrides):
