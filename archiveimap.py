@@ -84,7 +84,7 @@ def call(args, log=None, quiet=False):
 def fixpath(path):
     '''
     If path starts with '~' return expanduser(path), otherwise return
-    abspath(path)
+    abspath(path).
     '''
     if path[0] == '~':
         return expanduser(path)
@@ -141,7 +141,7 @@ def parse_config_file(config_file):
 
 
 def find_value(values):
-    '''Return the first value in values that isn't None'''
+    '''Return the first value in values that isn't None.'''
     for value in values:
         if value is not None:
             return value
@@ -218,8 +218,10 @@ def get_settings(overrides):
     return values
 
 
-def archive_imap(overrides={}):
+def archive_imap(overrides=None):
     '''Call offlineimap and put the results in a git repository.'''
+    if overrides is None:
+        overrides = {}
     settings = get_settings(overrides)
     accounts, author, config_file, quiet = settings
     accounts, directories = get_directories(accounts, config_file)
