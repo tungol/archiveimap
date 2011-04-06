@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+
+'''setup.py for ArchiveIMAP.'''
+
 from setuptools import setup
 import archiveimap
 
