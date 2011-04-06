@@ -1,5 +1,7 @@
 import archiveimap
+from archiveimap import run
 
+__all__ = ['run']
 __doc__ = archiveimap.__doc__
 __version__ = archiveimap.__version__
 __author__ = archiveimap.__author__
