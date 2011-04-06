@@ -25,3 +25,5 @@ named Settings. The following options are available:
 * offlineimap-config: the path to the offlineimap configuration file. Defaults to ~/.offlineimaprc
 * author: The author to use when making commits in git. Defaults to whatever git is configured to use by default.
 * quiet: True or False. Controls whether to output status to stdout as well as logging to git commit message. Defaults to False.
+
+See archiveimap -h for the command line options.
