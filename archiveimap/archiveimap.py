@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# encoding: utf-8
 
 '''\
 ArchiveIMAP is a tool to keep an email account in version control. It's a
