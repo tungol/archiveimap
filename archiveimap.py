@@ -15,7 +15,6 @@ precedence over the configuration file.
 '''
 
 # TODO: save configuration from commandline to config_file
-# TODO: setup.py, etc
 
 from __future__ import print_function
 from argparse import ArgumentParser
@@ -25,9 +24,12 @@ import os
 from os.path import abspath, exists, expanduser, join
 import subprocess
 
-__author__ = 'Stephen Morton'
 __version__ = '0.1'
-__license__ = '3-Clause BSD'
+__author__ = 'Stephen Morton'
+__author_email__ = 'tungolcraft@gmail.com'
+__description__ = 'Keep your email in git.'
+__license__ = 'BSD'
+__url__ = ''  # TODO: when it has a url
 
 
 def call(args, log=None, quiet=False):
