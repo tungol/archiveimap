@@ -4,7 +4,7 @@
 '''\
 ArchiveIMAP is a tool to keep an email account in version control. It's a
 pretty simple wrapper around OfflineIMAP and git. The commit message is what
-offlineimap prints to stdout while running.
+OfflineIMAP prints to stdout while running.
 
 To use:
 Make sure offlineimap and git are both installed and that OfflineIMAP is
@@ -223,6 +223,7 @@ def parse_args():
 
 
 def run():
+    '''Run archiveimap, parsing arguments from sys.argv.'''
     archive_imap(parse_args())
 
 if __name__ == '__main__':
