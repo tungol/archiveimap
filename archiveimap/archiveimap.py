@@ -27,7 +27,7 @@ import subprocess
 __version__ = '0.1'
 __author__ = 'Stephen Morton'
 __author_email__ = 'tungolcraft@gmail.com'
-__description__ = 'Keep your email in git.'
+__description__ = 'Keep your email archived in git.'
 __license__ = 'BSD'
 __url__ = ''  # TODO: when it has a url
 
@@ -198,7 +198,7 @@ def parse_args():
     Build an ArgumentParser instance and return the parsed arguments as a
     dictionary.
     '''
-    parser = ArgumentParser(description='Keep your email archived in git.')
+    parser = ArgumentParser(description=__description__)
     parser.add_argument('-q', '--quiet', dest='quiet', const=True,
                         action='store_const', help='be quiet')
     parser.add_argument('-v', '--verbose', dest='quiet', const=False,
