@@ -12,21 +12,6 @@ using config files in the default locations and the system git author,
 this is all that is needed. For other configurations, options can be set in
 a configuration file or at the command line. The command line takes
 precedence over the configuration file.
-
-The configuration file defaults to ~/.archiveimaprc and has a single section
-named Settings. The following options are available:
-
-accounts: a comma seperated list of accounts to sync and put in git.
-          Accounts must be defined in the offlineimap configuration file.
-          Defaults to whatever accounts offlineimap is configured to sync.
-offlineimap-config: the path to the offlineimap configuration file. Defaults
-                    to ~/.offlineimaprc
-author: The author to use when making commits in git. Defaults to whatever
-        git is configured to use by default.
-quiet: True or False. Controls whether to output status to stdout as well as
-       logging to git commit message. Defaults to False.
-
-Commandline options can be examined by running ./archiveimap.py -h
 '''
 
 # TODO: save configuration from commandline to config_file
@@ -42,32 +27,7 @@ import subprocess
 
 __author__ = 'Stephen Morton'
 __version__ = '0.1'
-__license__ = '''
-Copyright (c) 2011, Stephen Morton
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the copyright holder nor the
-      names of other contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-'''
+__license__ = '3-Clause BSD'
 
 
 def call(args, log=None, quiet=False):
