@@ -15,7 +15,7 @@ a configuration file or at the command line. The command line takes
 precedence over the configuration file.
 '''
 
-# TODO: save configuration from commandline to config_file
+# TODO: save configuration from commandline to config_file (maybe useful?)
 
 from __future__ import print_function
 from argparse import ArgumentParser
@@ -30,7 +30,7 @@ __author__ = 'Stephen Morton'
 __author_email__ = 'tungolcraft@gmail.com'
 __description__ = 'Keep your email archived in git.'
 __license__ = 'BSD'
-__url__ = ''  # TODO: when it has a url
+__url__ = 'https://github.com/tungolcraft/archiveimap'
 
 
 def call(args, log=None, quiet=False):
