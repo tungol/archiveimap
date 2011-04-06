@@ -9,6 +9,7 @@ setup(
       name = 'archiveimap',
       version = archiveimap.__version__,
       packages = ['archiveimap'],
+      scripts = ['bin/archiveimap'],
       author = archiveimap.__author__,
       author_email = archiveimap.__author_email__,
       description = archiveimap.__description__,

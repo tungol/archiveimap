@@ -221,5 +221,8 @@ def parse_args():
     return vars(parser.parse_args())
 
 
-if __name__ == '__main__':
+def run():
     archive_imap(parse_args())
+
+if __name__ == '__main__':
+    run()
