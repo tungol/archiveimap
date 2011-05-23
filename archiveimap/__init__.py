@@ -14,11 +14,9 @@ precedence over the configuration file.
 '''
 
 
-import archiveimap
-from archiveimap import run
+from .archiveimap import run
 
 __all__ = ['run']
-__doc__ = archiveimap.__doc__
 __version__ = '0.1'
 __author__ = 'Stephen Morton'
 __author_email__ = 'tungolcraft@gmail.com'
